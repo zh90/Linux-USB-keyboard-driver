@@ -178,3 +178,50 @@ module_exit(usb_kbd_exit);
 　　kbd->usbdev->devpath, i); 
 
 　　}
+
+
+static int usb_kbd_event(struct input_dev *dev, unsigned int type, 
+
+　　unsigned int code, int value) 
+
+　　{ 
+
+　　struct usb_kbd *kbd = dev->private; 
+
+　　if (type != EV_LED) /*不支持LED事件 */ 
+
+　　return -1; 
+
+　　/*获取指示灯的目标状态*/ 
+
+　　kbd->newleds = (!!test_bit(LED_KANA, dev->led) << 3) | (!!test_bit(LED_COMPOSE, dev->led) << 3) | 
+
+　　(!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL, dev->led) << 1) | 
+
+　　(!!test_bit(LED_NUML, dev->led)); 
+
+　　if (kbd->led->status == -EINPROGRESS) 
+
+　　return 0; 
+
+　　/* 
+
+　　指示灯状态已经是目标状态则不需要再做任何操作*/ 
+
+　　if (*(kbd->leds) == kbd->newleds) 
+
+　　return 0; 
+
+　　*(kbd->leds) = kbd->newleds; 
+
+　　kbd->led->dev = kbd->usbdev; 
+
+　　/*发送usb请求块*/ 
+
+　　if (usb_submit_urb(kbd->led, GFP_ATOMIC)) 
+
+　　err("usb_submit_urb(leds) failed"); 
+
+　　return 0; 
+
+　　}
