@@ -63,3 +63,118 @@ static void __exit usb_kbd_exit(void)
     printk("SUNWILL-USBKBD:usb_kbd_exit begin...\n"); 
     usb_deregister(&usb_kbd_driver);
  } 
+
+static struct usb_device_id usb_kbd_id_table [] = { 
+
+　　{ USB_INTERFACE_INFO(3, 1, 1) },
+    { }
+
+　　};
+MODULE_DEVICE_TABLE (usb, usb_kbd_id_table);
+
+module_init(usb_kbd_init);
+
+module_exit(usb_kbd_exit);
+
+　　static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs) 
+
+　　{ 
+
+　　struct usb_kbd *kbd = urb->context; 
+
+　　int i; 
+
+　　switch (urb->status) { 
+
+　　case 0: 
+
+　　break; 
+
+　　case -ECONNRESET:
+
+　　case -ENOENT: 
+
+　　case -ESHUTDOWN: 
+
+　　return; 
+
+　　
+
+　　default: 
+
+　　goto resubmit; 
+
+　　} 
+ 
+
+　　
+
+　　for (i = 0; i < 8; i++) 
+
+　　{ 
+
+　　input_report_key(kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1); 
+
+　　} 
+
+　
+
+　　for (i = 2; i < 8; i++) { 
+
+
+
+　　if (kbd->old > 3 && memscan(kbd->new + 2, kbd->old, 6) == kbd->new + 8) { 
+
+　　if (usb_kbd_keycode[kbd->old]) 
+
+　　{ 
+
+　　input_report_key(kbd->dev, usb_kbd_keycode[kbd->old], 0); 
+
+　　} 
+
+　　else 
+
+　　info("Unknown key (scancode %#x) released.", kbd->old); 
+
+　　} 
+
+
+
+　　if (kbd->new > 3 && memscan(kbd->old + 2, kbd->new, 6) == kbd->old + 8) {
+
+　　if (usb_kbd_keycode[kbd->new]) 
+
+　　{ 
+
+　　input_report_key(kbd->dev, usb_kbd_keycode[kbd->new], 1); 
+
+　　} 
+
+　　else 
+
+　　info("Unknown key (scancode %#x) pressed.", kbd->new); 
+
+　　} 
+
+　　} 
+
+
+
+　　input_sync(kbd->dev); 
+
+　　memcpy(kbd->old, kbd->new, 8);
+
+　　resubmit: 
+
+　　i = usb_submit_urb (urb, GFP_ATOMIC);
+
+　　if (i) 
+
+　　err ("can't resubmit intr, %s-%s/input0, status %d", 
+
+　　kbd->usbdev->bus->bus_name, 
+
+　　kbd->usbdev->devpath, i); 
+
+　　}
