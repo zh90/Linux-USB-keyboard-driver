@@ -253,3 +253,34 @@ module_exit(usb_kbd_exit);
 　　err("usb_submit_urb(leds) failed"); 
 
 　　} 
+
+/*打开键盘设备时，开始提交在 probe 函数中构建的 urb，进入 urb 周期。 */ 
+
+　　static int usb_kbd_open(struct input_dev *dev) 
+
+　　{ 
+
+　　struct usb_kbd *kbd = dev->private; 
+
+　　kbd->irq->dev = kbd->usbdev; 
+
+　　if (usb_submit_urb(kbd->irq, GFP_KERNEL)) 
+
+　　return -EIO; 
+
+　　return 0; 
+
+　　}
+
+　　/*关闭键盘设备时，结束 urb 生命周期。 */ 
+
+　　static void usb_kbd_close(struct input_dev *dev) 
+
+　　{ 
+
+　　struct usb_kbd *kbd = dev->private; 
+
+　　usb_kill_urb(kbd->irq); /*取消kbd->irq这个usb请求块*/ 
+
+　　} 
+
