@@ -515,3 +515,27 @@ module_exit(usb_kbd_exit);
 　　return -ENOMEM; 
 
 　　} 
+
+/*断开连接(如键盘设备拔出)的处理函数*/ 
+
+　　static void usb_kbd_disconnect(struct usb_interface *intf) 
+
+　　{ 
+
+　　struct usb_kbd *kbd = usb_get_intfdata (intf);/*获取接口的私有数据给kbd*/ 
+
+　　usb_set_intfdata(intf, NULL);/*设置接口的私有数据为NULL*/ 
+
+　　if (kbd) { 
+
+　　usb_kill_urb(kbd->irq);/*取消中断请求*/ 
+
+　　input_unregister_device(kbd->dev);/*注销设备*/ 
+
+　　usb_kbd_free_mem(interface_to_usbdev(intf), kbd);/*释放内存空间*/ 
+
+　　kfree(kbd); 
+
+　　} 
+
+　　}
