@@ -63,15 +63,6 @@ struct usb_kbd {
 	int open;
 };
 
-/*static struct usb_device_id usb_kbd_id_table [] = {
-
-	{ USB_INTERFACE_INFO(3, 1, 1) },//3,1,1分别表示接口类,接口子类,接口协议;3,1,1为键盘接口类;鼠标为3,1,2
-
-	{ }           // Terminating entry
-
-
-};*/
-
 MODULE_DEVICE_TABLE (usb, usb_kbd_id_table);/*指定设备ID表*/
 
 /*static void usb_kbd_irq(struct urb *urb)           //中断请求处理函数，有中断请求到达时调用该函数
