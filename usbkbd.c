@@ -13,6 +13,9 @@
 #define USB_HOTKEY_VENDOR_ID 0x07e4
 #define USB_HOTKEY_PRODUCT_ID 0x9473
 
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+
 static unsigned char usb_kbd_keycode[256] = {        /*使用第一套键盘扫描码表:A-1E;B-30;C-2E…*/
 
     0, 0, 0, 0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
@@ -47,9 +50,6 @@ static unsigned char usb_kbd_keycode[256] = {        /*使用第一套键盘扫�
 
     150,158,159,128,136,177,178,176,142,152,173,140
 };
-
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
 
 struct usb_kbd {
 	struct input_dev dev;
