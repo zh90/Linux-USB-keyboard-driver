@@ -1,3 +1,23 @@
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ * Should you need to contact me, the author, you can do so either by
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+*/
+
 
 #include <linux/kernel.h>      /*内核头文件，含有内核一些常用函数的原型定义*/
 #include <linux/slab.h>           /*定义内存分配的一些函数*/
@@ -13,7 +33,8 @@
 #define USB_HOTKEY_VENDOR_ID 0x07e4
 #define USB_HOTKEY_PRODUCT_ID 0x9473
 
-static unsigned char usb_kbd_keycode[256] = {        /*使用第一套键盘扫描码表:A-1E;B-30;C-2E…*/
+static unsigned char usb_kbd_keycode[256] = {        /*第一套键盘扫描码表:A-1E-30;B-30-48;C-2E-46*/
+
 
     0, 0, 0, 0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
 
@@ -118,7 +139,7 @@ static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 
         return;
 
-    /* -EPIPE: should clear the halt */
+    /*  should clear the halt */
 
     default:   /* error */
 
@@ -636,13 +657,13 @@ if (dev->actconfig->bNumInterfaces != 2)
 	return NULL;
 	}
 
-if (!(kbd = kmalloc(sizeof(struct usb_kbd), GFP_KERNEL))) return NULL;
-memset(kbd, 0, sizeof(struct usb_kbd));
-kbd->usbdev = dev;
-FILL_INT_URB(&kbd->irq, dev, pipe, kbd->new, maxp > 8 ? 8 : maxp,
-usb_kbd_irq,kbd, endpoint->bInterval); kbd->irq.dev = kbd->usbdev;
+//if (!(kbd = kmalloc(sizeof(struct usb_kbd), GFP_KERNEL))) return NULL;
+//memset(kbd, 0, sizeof(struct usb_kbd));
+//kbd->usbdev = dev;
+//FILL_INT_URB(&kbd->irq, dev, pipe, kbd->new, maxp > 8 ? 8 : maxp,
+//usb_kbd_irq,kbd, endpoint->bInterval); kbd->irq.dev = kbd->usbdev;
 if (dev->descriptor.iManufacturer) usb_string(dev, dev->descriptor.iManufacturer,
-kbd->name, 63);
+   kbd->name, 63);
 if (usb_submit_urb(&kbd->irq)) {
 	kfree(kbd); return NULL; }
 	printk(KERN_INFO "input%d: %s on usb%d:%d.%d\\n", kbd->dev.number,
