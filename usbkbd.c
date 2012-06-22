@@ -13,6 +13,9 @@
 #define USB_HOTKEY_VENDOR_ID 0x07e4
 #define USB_HOTKEY_PRODUCT_ID 0x9473
 
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+
 static unsigned char usb_kbd_keycode[256] = {        /*使用第一套键盘扫描码表:A-1E;B-30;C-2E…*/
 
     0, 0, 0, 0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
@@ -48,9 +51,6 @@ static unsigned char usb_kbd_keycode[256] = {        /*使用第一套键盘扫�
     150,158,159,128,136,177,178,176,142,152,173,140
 };
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
-
 struct usb_kbd {
 	struct input_dev dev;
 	struct usb_device *usbdev;
@@ -63,39 +63,9 @@ struct usb_kbd {
 	int open;
 };
 
-/*static struct usb_device_id usb_kbd_id_table [] = {
-
-	{ USB_INTERFACE_INFO(3, 1, 1) },//3,1,1分别表示接口类,接口子类,接口协议;3,1,1为键盘接口类;鼠标为3,1,2
-
-	{ }           // Terminating entry
-
-
-};*/
-
 MODULE_DEVICE_TABLE (usb, usb_kbd_id_table);/*指定设备ID表*/
 
-/*static void usb_kbd_irq(struct urb *urb)           //中断请求处理函数，有中断请求到达时调用该函数
-{
-	struct usb_kbd *kbd = urb->context;
-	int *new;
-	new = (int *) kbd->new;
-	if(kbd->new[0] == (char)0x01){
 
-	if(((kbd->new[1]>>4)&0x0f)!=0x7){
-
-	handle_scancode(0xe0,1);
-	handle_scancode(0x4b,1);
-	handle_scancode(0xe0,0);
-	handle_scancode(0x4b,0);
-}
-
-	else
-	{ handle_scancode(0xe0,1);
-	handle_scancode(0x4d,1);
-	handle_scancode(0xe0,0);
-	handle_scancode(0x4d,0);
-}
-}*/
 
 /*中断请求处理函数，有中断请求到达时调用该函数*/
 static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
