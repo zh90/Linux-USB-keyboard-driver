@@ -138,6 +138,7 @@ static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
     case -ESHUTDOWN:
 
         return;
+    //goto resubmit;
 
     /*  should clear the halt */
 
@@ -176,6 +177,16 @@ static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
           info("Unknown key (scancode %#x) released.", kbd->old);
 
     }
+//	/*获取键盘按下的中断*/
+//		if (kbd->new[i] > 3 && memscan(kbd->old + 2, kbd->new[i], 6) == kbd->old + 8) {/*同时没有该KEY的离开状态*/
+//			if (usb_kbd_keycode[kbd->new[i]])
+//			{
+//				input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i]], 1);
+//			}
+//			else
+//				info("Unknown key (scancode %#x) pressed.", kbd->new[i]);
+//		}
+//	}
 
 
     /*获取键盘按下的中断*/
