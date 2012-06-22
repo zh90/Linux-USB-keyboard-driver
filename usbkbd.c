@@ -166,34 +166,6 @@ resubmit:
         kbd->usbdev->devpath, i);_
 }
 
-/*static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
-
-{
-
-struct usb_kbd *kbd = urb->context;
-
-int i;
-switch (urb->status) {
-
-	case 0:       //success
-
-	break;
-
-	case -ECONNRESET: // unlink
-
-	case -ENOENT:
-
-	case -ESHUTDOWN:
-
-	return;
-
-	default:   // error
-
-	goto resubmit;
-
-    }
-}*/
-
 //编写事件处理函数：
 
 /*事件处理函数*/
