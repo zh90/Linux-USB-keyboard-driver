@@ -110,9 +110,9 @@ static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 
     /*获取键盘离开的中断*/
 
-    if (kbd->old > 3 && memscan(kbd->new + 2, kbd->old, 6) == kbd->new + 8) {/*同时没有该KEY的按下状态*/|
+    if (kbd->old > 3 && memscan(kbd->new + 2, kbd->old, 6) == kbd->new + 8) {/*同时没有该KEY的按下状态*/
 
-        if (usb_kbd_keycode[kbd->old])J
+        if (usb_kbd_keycode[kbd->old])
 
         {
 
@@ -352,21 +352,7 @@ static void usb_kbd_free_mem(struct usb_device *dev, struct usb_kbd *kbd)
     usb_buffer_free(dev, 1, kbd->leds, kbd->leds_dma);
 
 }
-/*static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum, const structusb_device_id *id)
-{
-	struct usb_interface *iface;
-	struct usb_interface_descriptor *interface;
-	struct usb_endpoint_descriptor *endpoint;
-	struct usb_kbd *kbd;
-	int pipe, maxp;
-	iface = &dev->actconfig->interface[ifnum];
-	interface = &iface->altsetting[iface->act_altsetting];
 
-	if ((dev->descriptor.idVendor != USB_HOTKEY_VENDOR_ID) ||
-	(dev->descriptor.idProduct != USB_HOTKEY_PRODUCT_ID) || (ifnum != 1))
-	{
-	return NULL;
-}*/
 /*USB键盘驱动探测函数，初始化设备并指定一些处理函数的地址*/
 
 static int usb_kbd_probe(struct usb_interface *iface,const struct usb_device_id *id)
