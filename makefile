@@ -4,9 +4,9 @@
 
 obj-m:=usbkbd.o
 
-KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+#KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 
-PWD:=$(shell pwd)
+#PWD:=$(shell pwd)
 
-default:
-$(MAKE) -C $(KERNELDIR) M=$(PWD) modules 
+#default:
+#$(MAKE) -C $(KERNELDIR) M=$(PWD) modules 

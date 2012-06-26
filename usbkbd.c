@@ -1,20 +1,16 @@
-
 #include <linux/kernel.h>      /*内核头文件，含有内核一些常用函数的原型定义*/
 #include <linux/slab.h>           /*定义内存分配的一些函数*/
 #include <linux/module.h>                   /*模块编译必须的头文件*/
 #include <linux/input.h>               /*输入设备相关函数的头文件*/
 #include <linux/init.h>                /*linux初始化模块函数定义*/
 #include <linux/usb.h>               /*USB设备相关函数定义*/
-#include <linux/kbd_ll.h>
+//#include <linux/kbd_ll.h>
 
 #define DRIVER_VERSION ""
-#define DRIVER_AUTHOR " TGE HOTKEY "
-#define DRIVER_DESC "USB HID Tge hotkey driver"
+#define DRIVER_AUTHOR " HITCS-39 "
+#define DRIVER_DESC "USB KBD "
 #define USB_HOTKEY_VENDOR_ID 0x07e4
 #define USB_HOTKEY_PRODUCT_ID 0x9473
-
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
 
 static unsigned char usb_kbd_keycode[256] = {        /*使用第一套键盘扫描码表:A-1E;B-30;C-2E…*/
 
@@ -51,21 +47,73 @@ static unsigned char usb_kbd_keycode[256] = {        /*使用第一套键盘扫�
     150,158,159,128,136,177,178,176,142,152,173,140
 };
 
-struct usb_kbd {
-	struct input_dev dev;
-	struct usb_device *usbdev;
-	unsigned char new[8];
-	unsigned char old[8];
-	struct urb irq, led;
-	struct usb_ctrlrequest dr;
-	unsigned char leds, newleds;
-	char name[128];
-	int open;
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+
+struct usb_kbd {                                 //  定义USB键盘结构体：
+
+    struct input_dev *dev; /*定义一个输入设备*/
+    struct usb_device *usbdev;/*定义一个usb设备*/
+    struct urb *irq;/*usb键盘之中断请求块*/
+    struct urb *led;
+    struct usb_ctrlrequest *cr;/*控制请求结构*/
+
+    unsigned char old[8]; /*按键离开时所用之数据缓冲区*/
+
+    unsigned char newleds;/*目标指定灯状态*/
+
+    char name[128];/*存放厂商名字及产品名字*/
+
+    char phys[64];/*设备之节点*/
+
+    unsigned char *new;/*按键按下时所用之数据缓冲区*/
+
+    unsigned char *leds;/*当前指示灯状态*/
+
+    dma_addr_t cr_dma; /*控制请求DMA缓冲地址*/
+
+    dma_addr_t new_dma; /*中断urb会使用该DMA缓冲区*/
+
+    dma_addr_t leds_dma; /*指示灯DMA缓冲地址*/
+
+};
+
+
+static struct usb_device_id usb_kbd_id_table [] = {
+
+	{ USB_INTERFACE_INFO(3, 1, 1) },//3,1,1分别表示接口类,接口子类,接口协议;3,1,1为键盘接口类;鼠标为3,1,2
+
+	{ }           // Terminating entry
 };
 
 MODULE_DEVICE_TABLE (usb, usb_kbd_id_table);/*指定设备ID表*/
 
 
+
+
+
+/*static void usb_kbd_irq(struct urb *urb)           //中断请求处理函数，有中断请求到达时调用该函数
+{
+	struct usb_kbd *kbd = urb->context;
+	int *new;
+	new = (int *) kbd->new;
+	if(kbd->new[0] == (char)0x01){
+
+	if(((kbd->new[1]>>4)&0x0f)!=0x7){
+
+	handle_scancode(0xe0,1);
+	handle_scancode(0x4b,1);
+	handle_scancode(0xe0,0);
+	handle_scancode(0x4b,0);
+}
+
+	else
+	{ handle_scancode(0xe0,1);
+	handle_scancode(0x4d,1);
+	handle_scancode(0xe0,0);
+	handle_scancode(0x4d,0);
+}
+}*/
 
 /*中断请求处理函数，有中断请求到达时调用该函数*/
 static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
@@ -96,7 +144,7 @@ static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 
     }
 
-    for (i = 0; i < 8; i++)/*8次的值依次是:29-42-56-125-97-54-100-126*/
+    for (i = 0; i < 8; i++)/*usb_kbd_keycode[224]-usb_kbd_keycode[231],8次的值依次是:29-42-56-125-97-54-100-126*/
 
     {
 
@@ -110,38 +158,38 @@ static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 
     /*获取键盘离开的中断*/
 
-    if (kbd->old > 3 && memscan(kbd->new + 2, kbd->old, 6) == kbd->new + 8) {/*同时没有该KEY的按下状态*/
+    if (kbd->old[i] > 3 && memscan(kbd->new + 2, kbd->old[i], 6) == kbd->new + 8) {/*同时没有该KEY的按下状态*/
 
-        if (usb_kbd_keycode[kbd->old])
+        if (usb_kbd_keycode[kbd->old[i]])
 
         {
 
-        input_report_key(kbd->dev, usb_kbd_keycode[kbd->old], 0);
+        input_report_key(kbd->dev, usb_kbd_keycode[kbd->old[i]], 0);
 
         }
 
         else
 
-          info("Unknown key (scancode %#x) released.", kbd->old);
+          printk("Unknown key (scancode %#x) released.", kbd->old[i]);
 
     }
 
 
     /*获取键盘按下的中断*/
 
-    if (kbd->new > 3 && memscan(kbd->old + 2, kbd->new, 6) == kbd->old + 8) {/*同时没有该KEY的离开状态*/
+    if (kbd->new[i] > 3 && memscan(kbd->old + 2, kbd->new[i], 6) == kbd->old + 8) {/*同时没有该KEY的离开状态*/
 
-        if (usb_kbd_keycode[kbd->new])
+        if (usb_kbd_keycode[kbd->new[i]])
 
         {
 
-          input_report_key(kbd->dev, usb_kbd_keycode[kbd->new], 1);
+          input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i]], 1);
 
         }
 
         else
 
-          info("Unknown key (scancode %#x) pressed.", kbd->new);
+          printk("Unknown key (scancode %#x) pressed.", kbd->new[i]);
 
     }
 
@@ -163,8 +211,36 @@ resubmit:
 
         kbd->usbdev->bus->bus_name,
 
-        kbd->usbdev->devpath, i);_
+        kbd->usbdev->devpath, i);
 }
+
+/*static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
+
+{
+
+struct usb_kbd *kbd = urb->context;
+
+int i;
+switch (urb->status) {
+
+	case 0:       //success
+
+	break;
+
+	case -ECONNRESET: // unlink
+
+	case -ENOENT:
+
+	case -ESHUTDOWN:
+
+	return;
+
+	default:   // error
+
+	goto resubmit;
+
+    }
+}*/
 
 //编写事件处理函数：
 
@@ -174,7 +250,7 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,unsigned int c
 
 {
 
-    struct usb_kbd *kbd = dev->private;
+    struct usb_kbd *kbd = dev->pri;
 
     if (type != EV_LED) /*不支持LED事件 */
 
@@ -211,32 +287,7 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,unsigned int c
 
 }
 
-struct usb_kbd {                                 //  定义USB键盘结构体：
 
-    struct input_dev *dev; /*定义一个输入设备*/
-    struct usb_device *usbdev;/*定义一个usb设备*/
-    struct urb *irq/*usb键盘之中断请求块*/
-    struct usb_ctrlrequest *cr;/*控制请求结构*
-
-    unsigned char old[8]; /*按键离开时所用之数据缓冲区*/
-
-    unsigned char newleds;/*目标指定灯状态*/
-
-    char name[128];/*存放厂商名字及产品名字*/
-
-    char phys[64];/*设备之节点*/
-
-    unsigned char *new;/*按键按下时所用之数据缓冲区*/
-
-    unsigned char *leds;/*当前指示灯状态*/
-
-    dma_addr_t cr_dma; /*控制请求DMA缓冲地址*/
-
-    dma_addr_t new_dma; /*中断urb会使用该DMA缓冲区*/
-
-    dma_addr_t leds_dma; /*指示灯DAM缓冲地址*/
-
-};
 
  //编写LED事件处理函数：
 /*接在event之后操作，该功能其实usb_kbd_event中已经有了，该函数的作用可能是防止event的操作失败，一般注释掉该函数中的所有行都可以正常工作*/
@@ -249,7 +300,7 @@ static void usb_kbd_led(struct urb *urb, struct pt_regs *regs)
 
     if (urb->status)
 
-    warn("led urb status %d received", urb->status);
+    printk("led urb status %d received", urb->status);
 
     if (*(kbd->leds) == kbd->newleds)/*指示灯状态已经是目标状态则不需要再做任何操作*/
 
@@ -273,7 +324,7 @@ static int usb_kbd_open(struct input_dev *dev)
 
 {
 
-    struct usb_kbd *kbd = dev->private;
+    struct usb_kbd *kbd = dev->pri;
 
     kbd->irq->dev = kbd->usbdev;
 
@@ -290,7 +341,7 @@ static int usb_kbd_open(struct input_dev *dev)
 
 static void usb_kbd_close(struct input_dev *dev)
 {
-    struct usb_kbd *kbd = dev->private;
+    struct usb_kbd *kbd = dev->pri;
 
     usb_kill_urb(kbd->irq); /*取消kbd->irq这个usb请求块*/
 }
@@ -352,7 +403,21 @@ static void usb_kbd_free_mem(struct usb_device *dev, struct usb_kbd *kbd)
     usb_buffer_free(dev, 1, kbd->leds, kbd->leds_dma);
 
 }
+/*static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum, const structusb_device_id *id)
+{
+	struct usb_interface *iface;
+	struct usb_interface_descriptor *interface;
+	struct usb_endpoint_descriptor *endpoint;
+	struct usb_kbd *kbd;
+	int pipe, maxp;
+	iface = &dev->actconfig->interface[ifnum];
+	interface = &iface->altsetting[iface->act_altsetting];
 
+	if ((dev->descriptor.idVendor != USB_HOTKEY_VENDOR_ID) ||
+	(dev->descriptor.idProduct != USB_HOTKEY_PRODUCT_ID) || (ifnum != 1))
+	{
+	return NULL;
+}*/
 /*USB键盘驱动探测函数，初始化设备并指定一些处理函数的地址*/
 
 static int usb_kbd_probe(struct usb_interface *iface,const struct usb_device_id *id)
@@ -463,11 +528,11 @@ static int usb_kbd_probe(struct usb_interface *iface,const struct usb_device_id 
 
     /* cdev 是设备所属类别（class device） */
 
-    input_dev->cdev.dev = &iface->dev;
+    input_dev->dev = iface->dev;
 
-/* input_dev 的 private 数据项用于表示当前输入设备的种类，这里将键盘结构体对象赋给它 */
+/* input_dev 的 pri 数据项用于表示当前输入设备的种类，这里将键盘结构体对象赋给它 */
 
-    input_dev->private = kbd;
+    input_dev->pri = kbd;
 
     input_dev->evbit[0] = BIT(EV_KEY)/*键码事件*/ | BIT(EV_LED)/*LED事件*/ | BIT(EV_REP)/*自动重覆数值*/;
 
@@ -475,7 +540,7 @@ static int usb_kbd_probe(struct usb_interface *iface,const struct usb_device_id 
 
     for (i = 0; i < 255; i++)
 
-    set_bit(usb_kbd_keycode, input_dev->keybit);
+    set_bit(usb_kbd_keycode[i], input_dev->keybit);
 
     clear_bit(0, input_dev->keybit);
 
@@ -559,48 +624,26 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
     }
 }
 
-if (dev->actconfig->bNumInterfaces != 2)
-	{
-	return NULL;
-	}
-
-if (!(kbd = kmalloc(sizeof(struct usb_kbd), GFP_KERNEL))) return NULL;
-memset(kbd, 0, sizeof(struct usb_kbd));
-kbd->usbdev = dev;
-FILL_INT_URB(&kbd->irq, dev, pipe, kbd->new, maxp > 8 ? 8 : maxp,
-usb_kbd_irq,kbd, endpoint->bInterval); kbd->irq.dev = kbd->usbdev;
-if (dev->descriptor.iManufacturer) usb_string(dev, dev->descriptor.iManufacturer,
-kbd->name, 63);
-if (usb_submit_urb(&kbd->irq)) {
-	kfree(kbd); return NULL; }
-	printk(KERN_INFO "input%d: %s on usb%d:%d.%d\\n", kbd->dev.number,
-	kbd->name, dev->bus->busnum, dev->devnum, ifnum);
-	return kbd; }
-static void usb_kbd_disconnect(struct usb_device *dev, void *ptr)
-{
-	struct usb_kbd *kbd = ptr;
-	usb_unlink_urb(&kbd->irq);
-	kfree(kbd);
-}
-static struct usb_device_id usb_kbd_id_table [] = {
+/*
+ static struct usb_device_id usb_kbd_id_table [] = {
 	{ USB_DEVICE(USB_HOTKEY_VENDOR_ID, USB_HOTKEY_PRODUCT_ID) },
-	{ } /* Terminating entry */
+	{ } //Terminating entry 
+};
+*/
+
+static struct usb_driver usb_kbd_driver = {               /*USB键盘驱动结构体*/
+	.name= "Topkey",                                      /*驱动名字*/
+	.probe= usb_kbd_probe,                            /*驱动探测函数,加载时用到*/
+	.disconnect= usb_kbd_disconnect,                   /*驱动断开函数,在卸载时用到*/
+	.id_table= usb_kbd_id_table,                      /*驱动设备ID表,用来指定设备或接口*/
 };
 
-MODULE_DEVICE_TABLE (usb, usb_kbd_id_table);
-static struct usb_driver usb_kbd_driver = {               /*USB键盘驱动结构体*/
-	name: "Topkey",                                      /*驱动名字*/
-	probe: usb_kbd_probe,                            /*驱动探测函数,加载时用到*/
-	disconnect: usb_kbd_disconnect,                   /*驱动断开函数,在卸载时用到*/
-	id_table: usb_kbd_id_table,                      /*驱动设备ID表,用来指定设备或接口*/
-	NULL,
-};
 static int __init usb_kbd_init(void)                   /*驱动程序生命周期的开始点，向 USB core 注册这个键盘驱动程序。*/
 {
     printk("Registering usb keyboard driver driver...\n");
 	int result = usb_register(&usb_kbd_driver);/*注册USB键盘驱动*/
 	if (result == 0) /*注册失败*/
-        info(DRIVER_VERSION ":" DRIVER_DESC);
+        printk(DRIVER_VERSION ":" DRIVER_DESC);
     printk("Registered successfully!\n");
 	return result;
 	//usb_register(&usb_kbd_driver);
