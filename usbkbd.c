@@ -92,28 +92,6 @@ MODULE_DEVICE_TABLE (usb, usb_kbd_id_table);/*指定设备ID表*/
 
 
 
-/*static void usb_kbd_irq(struct urb *urb)           //中断请求处理函数，有中断请求到达时调用该函数
-{
-	struct usb_kbd *kbd = urb->context;
-	int *new;
-	new = (int *) kbd->new;
-	if(kbd->new[0] == (char)0x01){
-
-	if(((kbd->new[1]>>4)&0x0f)!=0x7){
-
-	handle_scancode(0xe0,1);
-	handle_scancode(0x4b,1);
-	handle_scancode(0xe0,0);
-	handle_scancode(0x4b,0);
-}
-
-	else
-	{ handle_scancode(0xe0,1);
-	handle_scancode(0x4d,1);
-	handle_scancode(0xe0,0);
-	handle_scancode(0x4d,0);
-}
-}*/
 
 /*中断请求处理函数，有中断请求到达时调用该函数*/
 static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
@@ -214,33 +192,9 @@ resubmit:
         kbd->usbdev->devpath, i);
 }
 
-/*static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 
-{
 
-struct usb_kbd *kbd = urb->context;
 
-int i;
-switch (urb->status) {
-
-	case 0:       //success
-
-	break;
-
-	case -ECONNRESET: // unlink
-
-	case -ENOENT:
-
-	case -ESHUTDOWN:
-
-	return;
-
-	default:   // error
-
-	goto resubmit;
-
-    }
-}*/
 
 //编写事件处理函数：
 
@@ -403,21 +357,7 @@ static void usb_kbd_free_mem(struct usb_device *dev, struct usb_kbd *kbd)
     usb_buffer_free(dev, 1, kbd->leds, kbd->leds_dma);
 
 }
-/*static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum, const structusb_device_id *id)
-{
-	struct usb_interface *iface;
-	struct usb_interface_descriptor *interface;
-	struct usb_endpoint_descriptor *endpoint;
-	struct usb_kbd *kbd;
-	int pipe, maxp;
-	iface = &dev->actconfig->interface[ifnum];
-	interface = &iface->altsetting[iface->act_altsetting];
 
-	if ((dev->descriptor.idVendor != USB_HOTKEY_VENDOR_ID) ||
-	(dev->descriptor.idProduct != USB_HOTKEY_PRODUCT_ID) || (ifnum != 1))
-	{
-	return NULL;
-}*/
 /*USB键盘驱动探测函数，初始化设备并指定一些处理函数的地址*/
 
 static int usb_kbd_probe(struct usb_interface *iface,const struct usb_device_id *id)
