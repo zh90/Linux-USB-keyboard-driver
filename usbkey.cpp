@@ -166,3 +166,26 @@ fail1:	input_free_device(input_dev);
 	kfree(kbd);
 	return -ENOMEM;
 }
+
+
+//  编写模块卸载函数(每个驱动都会有一个卸载函数，由module_exit调用)： 6 h$ D# v& s& k& v. _, h0 a, S$ n
+
+/* 驱动程序生命周期的结束点，向 USB core 注销这个键盘驱动程序。 */
+
+static void __exit usb_kbd_exit(void)
+
+{
+
+      printk("SUNWILL-USBKBD:usb_kbd_exit begin...\n");
+
+
+    usb_deregister(&usb_kbd_driver);/*注销USB键盘驱动*/
+
+}
+8.   指定模块初始化函数(被指定的函数在insmod驱动时调用)：
+
+     module_init(usb_kbd_init); 
+
+9.   指定模块退出函数(被指定的函数在rmmod驱动时调用)：
+ 
+     module_exit(usb_kbd_exit); 
