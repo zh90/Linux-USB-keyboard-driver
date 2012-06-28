@@ -552,6 +552,24 @@ static int usb_kbd_probe(struct usb_interface *iface,const struct usb_device_id 
 
         le16_to_cpu(dev->descriptor.idProduct));
 
+    struct input_dev *dev; /*定义一个输入设备*/
+
+    struct usb_device *usbdev;/*定义一个usb设备*/
+
+    unsigned char old[8]; /*按键离开时所用之数据缓冲区*/
+
+    struct urb *irq/*usb键盘之中断请求块*/, *led/*usb键盘之指示灯请求块*/;
+
+
+    unsigned char newleds;/*目标指定灯状态*/
+
+    char name[128];/*存放厂商名字及产品名字*/
+
+
+    char phys[64];/*设备之节点*/
+
+
+    unsigned char *new;/*按键按下时所用之数据缓冲区*/
     /*设备链接地址*/
 
     usb_make_path(dev, kbd->phys, sizeof(kbd->phys));
@@ -633,9 +651,9 @@ static int usb_kbd_probe(struct usb_interface *iface,const struct usb_device_id 
 
     return 0;
 
-fail2:   usb_kbd_free_mem(dev, kbd);
+    fail2:   usb_kbd_free_mem(dev, kbd);
 
-fail1:   input_free_device(input_dev);
+    fail1:   input_free_device(input_dev);
 
     kfree(kbd);
 
@@ -673,13 +691,13 @@ if (dev->actconfig->bNumInterfaces != 2)
 //kbd->usbdev = dev;
 //FILL_INT_URB(&kbd->irq, dev, pipe, kbd->new, maxp > 8 ? 8 : maxp,
 //usb_kbd_irq,kbd, endpoint->bInterval); kbd->irq.dev = kbd->usbdev;
-if (dev->descriptor.iManufacturer) usb_string(dev, dev->descriptor.iManufacturer,
+/*if (dev->descriptor.iManufacturer) usb_string(dev, dev->descriptor.iManufacturer,
    kbd->name, 63);
 if (usb_submit_urb(&kbd->irq)) {
 	kfree(kbd); return NULL; }
 	printk(KERN_INFO "input%d: %s on usb%d:%d.%d\\n", kbd->dev.number,
 	kbd->name, dev->bus->busnum, dev->devnum, ifnum);
-	return kbd; }
+	return kbd; }*/
 static void usb_kbd_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct usb_kbd *kbd = ptr;
@@ -713,9 +731,145 @@ static int __init usb_kbd_init(void)                   /*驱动程序生命周�
 }
 static void __exit usb_kbd_exit(void)                  /* 驱动程序生命周期的结束点，向 USB core 注销这个键盘驱动程序。 */
 {
-    printk("Deregistering usb keyboard driver...\n");
+        printk("Deregistering usb keyboard driver...\n");
 	usb_deregister(&usb_kbd_driver);              /*注销USB键盘驱动*/
 	printk("Derigistered successfully!\n");
 }
 module_init(usb_kbd_init);                               /* 指定模块初始化函数(被指定的函数在insmod驱动时调用)*/
 module_exit(usb_kbd_exit);                           /* 指定模块退出函数(被指定的函数在rmmod驱动时调用)：, a/ ^; m; k. ]+ W/ c- I) _! o*/
+
+
+---------------------input 文件相关的重定义 ---------------------------------------------------------------------------------------------------
+
+#define EVIOCGVERSION		_IOR('E', 0x01, int)			/* get driver version */
+#define EVIOCGID		_IOR('E', 0x02, struct input_id)	/* get device ID */
+#define EVIOCGKEYCODE		_IOR('E', 0x04, int[2])			/* get keycode */
+#define EVIOCSKEYCODE		_IOW('E', 0x04, int[2])			/* set keycode */
+
+#define EVIOCGNAME(len)		_IOC(_IOC_READ, 'E', 0x06, len)		/* get device name */
+#define EVIOCGPHYS(len)		_IOC(_IOC_READ, 'E', 0x07, len)		/* get physical location */
+#define EVIOCGUNIQ(len)		_IOC(_IOC_READ, 'E', 0x08, len)		/* get unique identifier */
+
+#define EVIOCGKEY(len)		_IOC(_IOC_READ, 'E', 0x18, len)		/* get global keystate */
+#define EVIOCGLED(len)		_IOC(_IOC_READ, 'E', 0x19, len)		/* get all LEDs */
+#define EVIOCGSND(len)		_IOC(_IOC_READ, 'E', 0x1a, len)		/* get all sounds status */
+#define EVIOCGSW(len)		_IOC(_IOC_READ, 'E', 0x1b, len)		/* get all switch states */
+
+#define EVIOCGBIT(ev,len)	_IOC(_IOC_READ, 'E', 0x20 + ev, len)	/* get event bits */
+#define EVIOCGABS(abs)		_IOR('E', 0x40 + abs, struct input_absinfo)		/* get abs value/limits */
+#define EVIOCSABS(abs)		_IOW('E', 0xc0 + abs, struct input_absinfo)		/* set abs value/limits */
+
+#define EVIOCSFF		_IOC(_IOC_WRITE, 'E', 0x80, sizeof(struct ff_effect))	/* send a force effect to a force feedback device */
+#define EVIOCRMFF		_IOW('E', 0x81, int)			/* Erase a force effect */
+#define EVIOCGEFFECTS		_IOR('E', 0x84, int)			/* Report number of effects playable at the same time */
+
+#define EVIOCGRAB		_IOW('E', 0x90, int)			/* Grab/Release device */
+
+
+
+/*
+ * Structures used in ioctls to upload effects to a device
+ * The first structures are not passed directly by using ioctls.
+ * They are sub-structures of the actually sent structure (called ff_effect)
+ */
+
+
+struct ff_replay {
+	__u16 length; /* Duration of an effect in ms. All other times are also expressed in ms */
+	__u16 delay;  /* Time to wait before to start playing an effect */
+};
+
+struct ff_trigger {
+	__u16 button;   /* Number of button triggering an effect */
+	__u16 interval; /* Time to wait before an effect can be re-triggered (ms) */
+};
+
+struct ff_envelope {
+	__u16 attack_length;	/* Duration of attack (ms) */
+	__u16 attack_level;	/* Level at beginning of attack */
+	__u16 fade_length;	/* Duration of fade (ms) */
+	__u16 fade_level;	/* Level at end of fade */
+};
+
+/* FF_CONSTANT */
+struct ff_constant_effect {
+	__s16 level;	    /* Strength of effect. Negative values are OK */
+	struct ff_envelope envelope;
+};
+
+/* FF_RAMP */
+struct ff_ramp_effect {
+	__s16 start_level;
+	__s16 end_level;
+	struct ff_envelope envelope;
+};
+
+/* FF_SPRING of FF_FRICTION */
+struct ff_condition_effect {
+	__u16 right_saturation; /* Max level when joystick is on the right */
+	__u16 left_saturation;  /* Max level when joystick in on the left */
+
+	__s16 right_coeff;	/* Indicates how fast the force grows when the
+				   joystick moves to the right */
+	__s16 left_coeff;	/* Same for left side */
+
+	__u16 deadband;	/* Size of area where no force is produced */
+	__s16 center;	/* Position of dead zone */
+
+};
+
+/* FF_PERIODIC */
+struct ff_periodic_effect {
+	__u16 waveform;	/* Kind of wave (sine, square...) */
+	__u16 period;	/* in ms */
+	__s16 magnitude;	/* Peak value */
+	__s16 offset;	/* Mean value of wave (roughly) */
+	__u16 phase;		/* 'Horizontal' shift */
+
+	struct ff_envelope envelope;
+
+/* Only used if waveform == FF_CUSTOM */
+	__u32 custom_len;	/* Number of samples */
+	__s16 *custom_data;	/* Buffer of samples */
+/* Note: the data pointed by custom_data is copied by the driver. You can
+ * therefore dispose of the memory after the upload/update */
+};
+
+/* FF_RUMBLE */
+/* Some rumble pads have two motors of different weight.
+   strong_magnitude represents the magnitude of the vibration generated
+   by the heavy motor.
+*/
+struct ff_rumble_effect {
+	__u16 strong_magnitude;  /* Magnitude of the heavy motor */
+	__u16 weak_magnitude;    /* Magnitude of the light one */
+};
+
+/*
+ * Structure sent through ioctl from the application to the driver
+ */
+struct ff_effect {
+	__u16 type;
+/* Following field denotes the unique id assigned to an effect.
+ * If user sets if to -1, a new effect is created, and its id is returned in the same field
+ * Else, the user sets it to the effect id it wants to update.
+ */
+	__s16 id;
+
+	__u16 direction;	/* Direction. 0 deg -> 0x0000 (down)
+					     90 deg -> 0x4000 (left)
+					    180 deg -> 0x8000 (up)
+					    270 deg -> 0xC000 (right)
+				*/
+
+	struct ff_trigger trigger;
+	struct ff_replay replay;
+
+	union {
+		struct ff_constant_effect constant;
+		struct ff_ramp_effect ramp;
+		struct ff_periodic_effect periodic;
+		struct ff_condition_effect condition[2]; /* One for each axis */
+		struct ff_rumble_effect rumble;
+	} u;
+};
