@@ -165,10 +165,11 @@ fail2:	usb_kbd_free_mem(dev, kbd);
 fail1:	input_free_device(input_dev);
 	kfree(kbd);
 	return -ENOMEM;
+
 }
 
 
-//  编写模块卸载函数(每个驱动都会有一个卸载函数，由module_exit调用)： 6 h$ D# v& s& k& v. _, h0 a, S$ n
+//  编写模块卸载函数(每个驱动都会有一个卸载函数，由module_exit调用)： 
 
 /* 驱动程序生命周期的结束点，向 USB core 注销这个键盘驱动程序。 */
 
