@@ -722,7 +722,7 @@ static int __init usb_kbd_init(void)                   /*驱动程序生命周�
     printk("Registering usb keyboard driver driver...\n");
 	int result = usb_register(&usb_kbd_driver);/*注册USB键盘驱动*/
 	if (result == 0) /*注册失败*/
-        info(DRIVER_VERSION ":" DRIVER_DESC);
+     //   info(DRIVER_VERSION ":" DRIVER_DESC);
     printk("Registered successfully!\n");
 	return result;
 	//usb_register(&usb_kbd_driver);
