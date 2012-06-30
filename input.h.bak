@@ -1169,6 +1169,7 @@ struct input_mt_slot {
  * @node: used to place the device onto input_dev_list
  */
 struct input_dev {
+        void *pri;
 	const char *name;
 	const char *phys;
 	const char *uniq;

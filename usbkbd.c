@@ -1,601 +1,388 @@
-#include <linux/kernel.h>      /*å†…æ ¸å¤´æ–‡ä»¶ï¼Œå«æœ‰å†…æ ¸ä¸€äº›å¸¸ç”¨å‡½æ•°çš„åŸå‹å®šä¹‰*/
-#include <linux/slab.h>           /*å®šä¹‰å†…å­˜åˆ†é…çš„ä¸€äº›å‡½æ•°*/
-#include <linux/module.h>                   /*æ¨¡å—ç¼–è¯‘å¿…é¡»çš„å¤´æ–‡ä»¶*/
-#include <linux/input.h>               /*è¾“å…¥è®¾å¤‡ç›¸å…³å‡½æ•°çš„å¤´æ–‡ä»¶*/
-#include <linux/init.h>                /*linuxåˆå§‹åŒ–æ¨¡å—å‡½æ•°å®šä¹‰*/
-#include <linux/usb.h>               /*USBè®¾å¤‡ç›¸å…³å‡½æ•°å®šä¹‰*/
-//#include <linux/kbd_ll.h>
+#include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/usb/input.h>
+#include <linux/hid.h>
 
-#define DRIVER_VERSION ""
-#define DRIVER_AUTHOR " HITCS-39 "
-#define DRIVER_DESC "USB KBD "
-#define USB_HOTKEY_VENDOR_ID 0x07e4
-#define USB_HOTKEY_PRODUCT_ID 0x9473
+/*
+ * Version Information
+ */
+#define DRIVER_VERSION "2.0"
+#define DRIVER_AUTHOR "HITCS-39"
+#define DRIVER_DESC "USB HID keyboard driver"
+#define USB_KEYBOARD_VENDOR_ID 0x1c4f
+#define USB_KEYBOARD_PRODUCT_ID 0x0002
 
-static unsigned char usb_kbd_keycode[256] = {        /*ä½¿ç”¨ç¬¬ä¸€å¥—é”®ç›˜æ‰«æç è¡¨:A-1E;B-30;C-2Eâ€¦*/
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_LICENSE("GPL");
 
-    0, 0, 0, 0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
-
-    50, 49, 24, 25, 16, 19, 31, 20, 22, 47, 17, 45, 21, 44, 2, 3,
-
-    4, 5, 6, 7, 8, 9, 10, 11, 28, 1, 14, 15, 57, 12, 13, 26,
-
-    27, 43, 43, 39, 40, 41, 51, 52, 53, 58, 59, 60, 61, 62, 63, 64,
-
-    65, 66, 67, 68, 87, 88, 99, 70,119,110,102,104,111,107,109,106,
-
-    105,108,103, 69, 98, 55, 74, 78, 96, 79, 80, 81, 75, 76, 77, 71,
-
-    72, 73, 82, 83, 86,127,116,117,183,184,185,186,187,188,189,190,
-
-    191,192,193,194,134,138,130,132,128,129,131,137,133,135,136,113,
-
-    115,114, 0, 0, 0,121, 0, 89, 93,124, 92, 94, 95, 0, 0, 0,
-
-    122,123, 90, 91, 85, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    29, 42, 56,125, 97, 54,100,126,164,166,165,163,161,115,114,113,
-
-    150,158,159,128,136,177,178,176,142,152,173,140
+static const unsigned char usb_kbd_keycode[256] = {
+	  0,  0,  0,  0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
+	 50, 49, 24, 25, 16, 19, 31, 20, 22, 47, 17, 45, 21, 44,  2,  3,
+	  4,  5,  6,  7,  8,  9, 10, 11, 28,  1, 14, 15, 57, 12, 13, 26,
+	 27, 43, 43, 39, 40, 41, 51, 52, 53, 58, 59, 60, 61, 62, 63, 64,
+	 65, 66, 67, 68, 87, 88, 99, 70,119,110,102,104,111,107,109,106,
+	105,108,103, 69, 98, 55, 74, 78, 96, 79, 80, 81, 75, 76, 77, 71,
+	 72, 73, 82, 83, 86,127,116,117,183,184,185,186,187,188,189,190,
+	191,192,193,194,134,138,130,132,128,129,131,137,133,135,136,113,
+	115,114,  0,  0,  0,121,  0, 89, 93,124, 92, 94, 95,  0,  0,  0,
+	122,123, 90, 91, 85,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	 29, 42, 56,125, 97, 54,100,126,164,166,165,163,161,115,114,113,
+	150,158,159,128,136,177,178,176,142,152,173,140
 };
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
+struct usb_kbd {   //  ¶¨ÒåUSB¼üÅÌ½á¹¹Ìå£º
+	struct input_dev *dev;   //Ò»¸öÊäÈëÉè±¸
+	struct usb_device *usbdev;  //¶¨ÒåÒ»¸öusbÉè±¸
+	unsigned char old[8];  //Ç°Ò»´Î´¦ÀíurbÇëÇóÊ±°´¼ü×´Ì¬µÄ»º³åÇø
+	struct urb *irq, *led;  //°´¼üºÍ¿ØÖÆµÄÖĞ¶ÏÇëÇó¿éurb
+	unsigned char newleds; //¼üÅÌÖ¸¶¨µÆ×´Ì¬
+	char name[128];  //³§ÉÌÃû×ÖºÍ²úÆ·Ãû×Ö
+	char phys[64]; //Éè±¸½Úµã
 
-struct usb_kbd {                                 //  å®šä¹‰USBé”®ç›˜ç»“æ„ä½“ï¼š
-
-    struct input_dev *dev; /*å®šä¹‰ä¸€ä¸ªè¾“å…¥è®¾å¤‡*/
-    struct usb_device *usbdev;/*å®šä¹‰ä¸€ä¸ªusbè®¾å¤‡*/
-    struct urb *irq;/*usbé”®ç›˜ä¹‹ä¸­æ–­è¯·æ±‚å—*/
-    struct urb *led;
-    struct usb_ctrlrequest *cr;/*æ§åˆ¶è¯·æ±‚ç»“æ„*/
-
-    unsigned char old[8]; /*æŒ‰é”®ç¦»å¼€æ—¶æ‰€ç”¨ä¹‹æ•°æ®ç¼“å†²åŒº*/
-
-    unsigned char newleds;/*ç›®æ ‡æŒ‡å®šç¯çŠ¶æ€*/
-
-    char name[128];/*å­˜æ”¾å‚å•†åå­—åŠäº§å“åå­—*/
-
-    char phys[64];/*è®¾å¤‡ä¹‹èŠ‚ç‚¹*/
-
-    unsigned char *new;/*æŒ‰é”®æŒ‰ä¸‹æ—¶æ‰€ç”¨ä¹‹æ•°æ®ç¼“å†²åŒº*/
-
-    unsigned char *leds;/*å½“å‰æŒ‡ç¤ºç¯çŠ¶æ€*/
-
-    dma_addr_t cr_dma; /*æ§åˆ¶è¯·æ±‚DMAç¼“å†²åœ°å€*/
-
-    dma_addr_t new_dma; /*ä¸­æ–­urbä¼šä½¿ç”¨è¯¥DMAç¼“å†²åŒº*/
-
-    dma_addr_t leds_dma; /*æŒ‡ç¤ºç¯DMAç¼“å†²åœ°å€*/
-
+	unsigned char *new;  //°´¼ü°´ÏÂÊ±´¦ÀíurbÇëÇóÊ±µ±Ç°°´¼ü×´Ì¬µÄ»º³åÇø
+	struct usb_ctrlrequest *cr;  //¿ØÖÆÇëÇó½á¹¹
+	unsigned char *leds;  //µ±Ç°Ö¸Ê¾µÆ×´Ì¬
+	dma_addr_t cr_dma;  //¿ØÖÆÇëÇóURBµÄDMA»º³åµØÖ·
+	dma_addr_t new_dma;  //ÖĞ¶Ïurb»áÊ¹ÓÃ¸ÃDMA»º³åÇø
+	dma_addr_t leds_dma; //Ö¸Ê¾µÆDMA»º³åµØÖ·
 };
 
+//ÊäÈëÖĞ¶ÏÊÂ¼ş´¦Àíº¯Êı
 
-static struct usb_device_id usb_kbd_id_table [] = {
-
-	{ USB_INTERFACE_INFO(3, 1, 1) },//3,1,1åˆ†åˆ«è¡¨ç¤ºæ¥å£ç±»,æ¥å£å­ç±»,æ¥å£åè®®;3,1,1ä¸ºé”®ç›˜æ¥å£ç±»;é¼ æ ‡ä¸º3,1,2
-
-	{ }           // Terminating entry
-};
-
-MODULE_DEVICE_TABLE (usb, usb_kbd_id_table);/*æŒ‡å®šè®¾å¤‡IDè¡¨*/
-
-
-
-
-
-
-/*ä¸­æ–­è¯·æ±‚å¤„ç†å‡½æ•°ï¼Œæœ‰ä¸­æ–­è¯·æ±‚åˆ°è¾¾æ—¶è°ƒç”¨è¯¥å‡½æ•°*/
-static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
+static void usb_kbd_irq(struct urb *urb)
 {
-    struct usb_kbd *kbd = urb->context;
+	printk("Starting irq\n");
+	struct usb_kbd *kbd = urb->context;
+	int i;
 
-    int i;
+	switch (urb->status) {  //ÅĞ¶ÏURBµÄ×´Ì¬
+	case 0:			//URB±»³É¹¦½ÓÊÕ
+		break;
+	case -ECONNRESET:	//¶Ï¿ªÁ¬½Ó´íÎó,urbÎ´ÖÕÖ¹¾Í·µ»Ø¸øÁË»Øµ÷º¯Êı
+	case -ENOENT: //urb±»killÁË,ÉúÃüÖÜÆÚ³¹µ×±»ÖÕÖ¹
+	case -ESHUTDOWN:  //USBÖ÷¿ØÖÆÆ÷Çı¶¯³ÌĞò·¢ÉúÁËÑÏÖØµÄ´íÎó,»òÕßÌá½»ÍêµÄÒ»Ë²¼äÉè±¸±»°Î³ö
+		return;
+	
+	default:		//ÆäËü´íÎó,¾ù¿ÉÒÔÖØĞÂÌá½»urb
+		goto resubmit;
+	}
+	printk("irq1\n");
+	for (i = 0; i < 8; i++)
+		input_report_key(kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);/*usb_kbd_keycode[224]-usb_kbd_keycode[231],8´ÎµÄÖµÒÀ´ÎÊÇ:29-42-56-125-97-54-100-126,ÅĞ¶ÏÕâ8¸ö¼üµÄ×´Ì¬*/
+	printk("irq2\n");
+	//ÈôÍ¬Ê±Ö»°´ÏÂ2¸ö°´¼üÔòÁíÒ»¸ö¼üÔÚµÚ[2]¸ö×Ö½Ú,ÈôÍ¬Ê±ÓĞÁ½¸ö°´¼üÔòµÚ¶ş¸öÔÚµÚ[3]×Ö½Ú£¬ÀàÍÆ×î¶à¿ÉÓĞ6¸ö°´¼üÍ¬Ê±°´ÏÂ
+	for (i = 2; i < 8; i++) {
 
-      switch (urb->status) {
+		if (kbd->old[i] > 3 && memscan(kbd->new + 2, kbd->old[i], 6) == kbd->new + 8) {  //ÅĞ¶ÏÄÇĞ©¼üµÄ×´Ì¬¸Ä±äÁË,¼´ÓÉ°´ÏÂ±äÎªÁËËÉ¿ª
+			if (usb_kbd_keycode[kbd->old[i]])  //ÊÇ¼üÅÌËùÓÃµÄ°´¼ü,¾Í±¨¸æ°´¼üÀë¿ª
+				input_report_key(kbd->dev, usb_kbd_keycode[kbd->old[i]], 0);
+			else                   //²»ÊÇ¼üÅÌËùÓÃµÄ°´¼ü
+				dev_info(&urb->dev->dev,
+						"Unknown key (scancode %#x) released.\n", kbd->old[i]);
+		}
 
-    case 0:       /* success */
+		if (kbd->new[i] > 3 && memscan(kbd->old + 2, kbd->new[i], 6) == kbd->old + 8) {  //ÅĞ¶ÏÄÇĞ©¼üµÄ×´Ì¬¸Ä±äÁË,¼´ÓÉËÉ¿ª±äÎªÁË°´ÏÂ
+			if (usb_kbd_keycode[kbd->new[i]])  //ÊÇ¼üÅÌËùÓÃµÄ°´¼ü,¾Í±¨¸æ°´¼ü±»°´ÏÂ
+				input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i]], 1);
+			else        //²»ÊÇ¼üÅÌËùÓÃµÄ°´¼ü
+				dev_info(&urb->dev->dev,
+						"Unknown key (scancode %#x) released.\n", kbd->new[i]);
+		}
+	}
 
-        break;
-
-    case -ECONNRESET: /* unlink */
-
-    case -ENOENT:
-
-    case -ESHUTDOWN:
-
-        return;
-
-    /* -EPIPE: should clear the halt */
-
-    default:   /* error */
-
-    goto resubmit;
-
-    }
-
-    for (i = 0; i < 8; i++)/*usb_kbd_keycode[224]-usb_kbd_keycode[231],8æ¬¡çš„å€¼ä¾æ¬¡æ˜¯:29-42-56-125-97-54-100-126*/
-
-    {
-
-    input_report_key(kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);
-
-    }
-
-/*è‹¥åŒæ—¶åªæŒ‰ä¸‹1ä¸ªæŒ‰é”®åˆ™åœ¨ç¬¬[2]ä¸ªå­—èŠ‚,è‹¥åŒæ—¶æœ‰ä¸¤ä¸ªæŒ‰é”®åˆ™ç¬¬äºŒä¸ªåœ¨ç¬¬[3]å­—èŠ‚ï¼Œç±»æ¨æœ€å¤šå¯æœ‰6ä¸ªæŒ‰é”®åŒæ—¶æŒ‰ä¸‹*/
-
-    for (i = 2; i < 8; i++) {
-
-    /*è·å–é”®ç›˜ç¦»å¼€çš„ä¸­æ–­*/
-
-    if (kbd->old[i] > 3 && memscan(kbd->new + 2, kbd->old[i], 6) == kbd->new + 8) {/*åŒæ—¶æ²¡æœ‰è¯¥KEYçš„æŒ‰ä¸‹çŠ¶æ€*/
-
-        if (usb_kbd_keycode[kbd->old[i]])
-
-        {
-
-        input_report_key(kbd->dev, usb_kbd_keycode[kbd->old[i]], 0);
-
-        }
-
-        else
-
-          printk("Unknown key (scancode %#x) released.", kbd->old[i]);
-
-    }
-
-
-    /*è·å–é”®ç›˜æŒ‰ä¸‹çš„ä¸­æ–­*/
-
-    if (kbd->new[i] > 3 && memscan(kbd->old + 2, kbd->new[i], 6) == kbd->old + 8) {/*åŒæ—¶æ²¡æœ‰è¯¥KEYçš„ç¦»å¼€çŠ¶æ€*/
-
-        if (usb_kbd_keycode[kbd->new[i]])
-
-        {
-
-          input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i]], 1);
-
-        }
-
-        else
-
-          printk("Unknown key (scancode %#x) pressed.", kbd->new[i]);
-
-    }
-
-    }
-
-    /*åŒæ­¥è®¾å¤‡,å‘ŠçŸ¥äº‹ä»¶çš„æ¥æ”¶è€…é©±åŠ¨å·²ç»å‘å‡ºäº†ä¸€ä¸ªå®Œæ•´çš„æŠ¥å‘Š*/
-
-    input_sync(kbd->dev);
-
-    memcpy(kbd->old, kbd->new, 8);/*é˜²æ­¢æœªæ¾å¼€æ—¶è¢«å½“æˆæ–°çš„æŒ‰é”®å¤„ç†*/
-
+	input_sync(kbd->dev);  //Í¬²½Éè±¸,¸æÖªÊÂ¼şµÄ½ÓÊÕÕßÇı¶¯ÒÑ¾­·¢³öÁËÒ»¸öÍêÕûµÄinput×ÓÏµÍ³µÄ±¨¸æ
+	
+        printk("irq2.1\n");
+	memcpy(kbd->old, kbd->new, 8);  //½«±¾´ÎµÄ°´¼ü×´Ì¬¿½±´µ½kbd->old,ÓÃ×÷ÏÂ´Îurb´¦ÀíÊ±ÅĞ¶Ï°´¼ü×´Ì¬µÄ¸Ä±ä
+        printk("irq3\n");
 resubmit:
-
-    i = usb_submit_urb (urb, GFP_ATOMIC);/*å‘é€USBè¯·æ±‚å—*/
-
-    if (i)
-
-    err ("can't resubmit intr, %s-%s/input0, status %d",
-
-        kbd->usbdev->bus->bus_name,
-
-        kbd->usbdev->devpath, i);
+	i = usb_submit_urb (urb, GFP_ATOMIC); //ÖØĞÂ·¢ËÍurbÇëÇó¿é
+	if (i)  //·¢ËÍurbÇëÇó¿éÊ§°Ü
+	{
+		printk("irq4\n");
+		err_hid ("can't resubmit intr, %s-%s/input0, status %d",
+				kbd->usbdev->bus->bus_name,
+				kbd->usbdev->devpath, i);
+		printk("irq5\n");
+	}
+	printk("irq6\n");
 }
 
-
-
-
-
-//ç¼–å†™äº‹ä»¶å¤„ç†å‡½æ•°ï¼š
-
-/*äº‹ä»¶å¤„ç†å‡½æ•°*/
-
-static int usb_kbd_event(struct input_dev *dev, unsigned int type,unsigned int code, int value)
-
+static int usb_kbd_event(struct input_dev *dev, unsigned int type,
+			 unsigned int code, int value)
 {
+	printk("Starting event.\n");
+	struct usb_kbd *kbd = input_get_drvdata(dev);
 
-    struct usb_kbd *kbd = dev->pri;
+	if (type != EV_LED)
+		return -1;
 
-    if (type != EV_LED) /*ä¸æ”¯æŒLEDäº‹ä»¶ */
+	kbd->newleds = (!!test_bit(LED_KANA,    dev->led) << 3) | (!!test_bit(LED_COMPOSE, dev->led) << 3) |
+		       (!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL,   dev->led) << 1) |
+		       (!!test_bit(LED_NUML,    dev->led));
 
-    return -1;
+	if (kbd->led->status == -EINPROGRESS)
+		return 0;
 
-    /*è·å–æŒ‡ç¤ºç¯çš„ç›®æ ‡çŠ¶æ€*/
+	if (*(kbd->leds) == kbd->newleds)
+		return 0;
 
-    kbd->newleds = (!!test_bit(LED_KANA,   dev->led) << 3) | (!!test_bit(LED_COMPOSE, dev->led) << 3) |
+	*(kbd->leds) = kbd->newleds;
+	kbd->led->dev = kbd->usbdev;
+	if (usb_submit_urb(kbd->led, GFP_ATOMIC))
+		err_hid("usb_submit_urb(leds) failed");
 
-   (!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL,   dev->led) << 1) |
-
-   (!!test_bit(LED_NUML,   dev->led));
-
-    if (kbd->led->status == -EINPROGRESS)
-
-    return 0;
-
-    /*æŒ‡ç¤ºç¯çŠ¶æ€å·²ç»æ˜¯ç›®æ ‡çŠ¶æ€åˆ™ä¸éœ€è¦å†åšä»»ä½•æ“ä½œ*/
-
-    if (*(kbd->leds) == kbd->newleds)
-
-    return 0;
-
-    *(kbd->leds) = kbd->newleds;
-
-    kbd->led->dev = kbd->usbdev;
-
-    /*å‘é€usbè¯·æ±‚å—*/
-    if (usb_submit_urb(kbd->led, GFP_ATOMIC))
-
-    err("usb_submit_urb(leds) failed");
-
-    return 0;
-
+	return 0;
 }
 
-
-
- //ç¼–å†™LEDäº‹ä»¶å¤„ç†å‡½æ•°ï¼š
-/*æ¥åœ¨eventä¹‹åæ“ä½œï¼Œè¯¥åŠŸèƒ½å…¶å®usb_kbd_eventä¸­å·²ç»æœ‰äº†ï¼Œè¯¥å‡½æ•°çš„ä½œç”¨å¯èƒ½æ˜¯é˜²æ­¢eventçš„æ“ä½œå¤±è´¥ï¼Œä¸€èˆ¬æ³¨é‡Šæ‰è¯¥å‡½æ•°ä¸­çš„æ‰€æœ‰è¡Œéƒ½å¯ä»¥æ­£å¸¸å·¥ä½œ*/
-
-static void usb_kbd_led(struct urb *urb, struct pt_regs *regs)
-
+static void usb_kbd_led(struct urb *urb)
 {
+	printk("Starting led\n");
+	struct usb_kbd *kbd = urb->context;
 
-    struct usb_kbd *kbd = urb->context;
+	if (urb->status)
+		dev_warn(&urb->dev->dev, "led urb status %d received\n",
+			 urb->status);
 
-    if (urb->status)
+	if (*(kbd->leds) == kbd->newleds)
+		return;
 
-    printk("led urb status %d received", urb->status);
-
-    if (*(kbd->leds) == kbd->newleds)/*æŒ‡ç¤ºç¯çŠ¶æ€å·²ç»æ˜¯ç›®æ ‡çŠ¶æ€åˆ™ä¸éœ€è¦å†åšä»»ä½•æ“ä½œ*/
-
-    return;
-
-    *(kbd->leds) = kbd->newleds;
-
-    kbd->led->dev = kbd->usbdev;
-
-    if (usb_submit_urb(kbd->led, GFP_ATOMIC))
-
-    err("usb_submit_urb(leds) failed");
-
+	*(kbd->leds) = kbd->newleds;
+	kbd->led->dev = kbd->usbdev;
+	if (usb_submit_urb(kbd->led, GFP_ATOMIC))
+		err_hid("usb_submit_urb(leds) failed");
 }
 
- //ç¼–å†™USBè®¾å¤‡æ‰“å¼€å‡½æ•°:
 
-/*æ‰“å¼€é”®ç›˜è®¾å¤‡æ—¶ï¼Œå¼€å§‹æäº¤åœ¨ probe å‡½æ•°ä¸­æ„å»ºçš„ urbï¼Œè¿›å…¥ urb å‘¨æœŸã€‚ */
-
+ //±àĞ´USBÉè±¸´ò¿ªº¯Êı:´ò¿ª¼üÅÌÉè±¸Ê±£¬¿ªÊ¼Ìá½»ÔÚ probe º¯ÊıÖĞ¹¹½¨µÄ urb£¬½øÈë urb ÖÜÆÚ¡£ 
 static int usb_kbd_open(struct input_dev *dev)
-
 {
-
-    struct usb_kbd *kbd = dev->pri;
-
-    kbd->irq->dev = kbd->usbdev;
-
-    if (usb_submit_urb(kbd->irq, GFP_KERNEL))
-
-      return -EIO;
-
-    return 0;
-
+	printk("Opening\n");
+	struct usb_kbd *kbd = input_get_drvdata(dev);
+	printk("open1\n\n");
+	kbd->irq->dev = kbd->usbdev;
+	if (usb_submit_urb(kbd->irq, GFP_KERNEL))
+		return -EIO;
+	printk("open2\n");
+	return 0;
 }
 
-// ç¼–å†™USBè®¾å¤‡å…³é—­å‡½æ•°
-/*å…³é—­é”®ç›˜è®¾å¤‡æ—¶ï¼Œç»“æŸ urb ç”Ÿå‘½å‘¨æœŸã€‚ */
-
+// ±àĞ´USBÉè±¸¹Ø±Õº¯Êı£º¹Ø±Õ¼üÅÌÉè±¸Ê±£¬½áÊø urb ÉúÃüÖÜÆÚ¡£ 
 static void usb_kbd_close(struct input_dev *dev)
 {
-    struct usb_kbd *kbd = dev->pri;
+	struct usb_kbd *kbd = input_get_drvdata(dev);
 
-    usb_kill_urb(kbd->irq); /*å–æ¶ˆkbd->irqè¿™ä¸ªusbè¯·æ±‚å—*/
+	usb_kill_urb(kbd->irq);
 }
 
-//åˆ›å»ºURB
 
-/*åˆ†é…URBå†…å­˜ç©ºé—´å³åˆ›å»ºURB*/
-
+//´´½¨URB£º·ÖÅäURBÄÚ´æ¿Õ¼ä¼´´´½¨URB
 static int usb_kbd_alloc_mem(struct usb_device *dev, struct usb_kbd *kbd)
 {
+	if (!(kbd->irq = usb_alloc_urb(0, GFP_KERNEL)))
+		return -1;
+	if (!(kbd->led = usb_alloc_urb(0, GFP_KERNEL)))
+		return -1;
+	if (!(kbd->new = usb_buffer_alloc(dev, 8, GFP_ATOMIC, &kbd->new_dma)))
+		return -1;
+	if (!(kbd->cr = usb_buffer_alloc(dev, sizeof(struct usb_ctrlrequest), GFP_ATOMIC, &kbd->cr_dma)))
+		return -1;
+	if (!(kbd->leds = usb_buffer_alloc(dev, 1, GFP_ATOMIC, &kbd->leds_dma)))
+		return -1;
 
-    if (!(kbd->irq = usb_alloc_urb(0, GFP_KERNEL)))
-
-    return -1;
-
-    if (!(kbd->led = usb_alloc_urb(0, GFP_KERNEL)))
-
-    return -1;
-
-    if (!(kbd->new = usb_buffer_alloc(dev, 8, GFP_ATOMIC, &kbd->new_dma)))
-
-    return -1;
-
-    if (!(kbd->cr = usb_buffer_alloc(dev, sizeof(struct usb_ctrlrequest), GFP_ATOMIC, &kbd->cr_dma)))
-
-    return -1;
-
-    if (!(kbd->leds = usb_buffer_alloc(dev, 1, GFP_ATOMIC, &kbd->leds_dma)))
-
-    return -1;
-
-    return 0;
+	return 0;
 }
-// é”€æ¯URB
 
-/*é‡Šæ”¾URBå†…å­˜ç©ºé—´å³é”€æ¯URB*/
 
+// Ïú»ÙURB£ºÊÍ·ÅURBÄÚ´æ¿Õ¼ä¼´Ïú»ÙURB
 static void usb_kbd_free_mem(struct usb_device *dev, struct usb_kbd *kbd)
 {
-
-    if (kbd->irq)
-
-    usb_free_urb(kbd->irq);
-
-    if (kbd->led)
-
-    usb_free_urb(kbd->led);
-
-    if (kbd->new)
-
-    usb_buffer_free(dev, 8, kbd->new, kbd->new_dma);
-
-    if (kbd->cr)
-
-    usb_buffer_free(dev, sizeof(struct usb_ctrlrequest), kbd->cr, kbd->cr_dma);
-
-    if (kbd->leds)
-
-    usb_buffer_free(dev, 1, kbd->leds, kbd->leds_dma);
-
+	usb_free_urb(kbd->irq);
+	usb_free_urb(kbd->led);
+	usb_buffer_free(dev, 8, kbd->new, kbd->new_dma);
+	usb_buffer_free(dev, sizeof(struct usb_ctrlrequest), kbd->cr, kbd->cr_dma);
+	usb_buffer_free(dev, 1, kbd->leds, kbd->leds_dma);
 }
 
-/*USBé”®ç›˜é©±åŠ¨æ¢æµ‹å‡½æ•°ï¼Œåˆå§‹åŒ–è®¾å¤‡å¹¶æŒ‡å®šä¸€äº›å¤„ç†å‡½æ•°çš„åœ°å€*/
-
-static int usb_kbd_probe(struct usb_interface *iface,const struct usb_device_id *id)
-
+static int usb_kbd_probe(struct usb_interface *iface,
+			 const struct usb_device_id *id)  //usb_interface *iface:ÓÉÄÚºË×Ô¶¯»ñÈ¡µÄ½Ó¿Ú,Ò»¸ö½Ó¿Ú¶ÔÓ¦Ò»ÖÖ¹¦ÄÜ, struct usb_device_id *id:Éè±¸µÄ±êÊ¶·û
 {
-
-    struct usb_device *dev = interface_to_usbdev(iface);
-
-    struct usb_host_interface *interface;
-
-    struct usb_endpoint_descriptor *endpoint;
-
-    struct usb_kbd *kbd;
-
-    struct input_dev *input_dev;
-
-    int i, pipe, maxp;
-
-    /*å½“å‰é€‰æ‹©çš„interface*/
-
-    interface = iface->cur_altsetting;
-
-    /*é”®ç›˜åªæœ‰ä¸€ä¸ªä¸­æ–­INç«¯ç‚¹*/
-
-    if (interface->desc.bNumEndpoints != 1)
-
-    return -ENODEV;
-
-    /*è·å–ç«¯ç‚¹æè¿°ç¬¦*/
-
-    endpoint = &interface->endpoint[0].desc;
-
-    if (!(endpoint->bEndpointAddress & USB_DIR_IN))
-
-      return -ENODEV;
-
-    if ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_INT)
-
-      return -ENODEV;
-
-    /*å°†endpointè®¾ç½®ä¸ºä¸­æ–­INç«¯ç‚¹*/
-
-    pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
-
-    /*è·å–åŒ…çš„æœ€å¤§å€¼*/
-
-    maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
-
-    kbd = kzalloc(sizeof(struct usb_kbd), GFP_KERNEL);
-
-    input_dev = input_allocate_device();
-
-    if (!kbd || !input_dev)
-
-      goto fail1;
-
-    if (usb_kbd_alloc_mem(dev, kbd))
-
-      goto fail2;
-
-    /* å¡«å…… usb è®¾å¤‡ç»“æ„ä½“å’Œè¾“å…¥è®¾å¤‡ç»“æ„ä½“ */
-
-    kbd->usbdev = dev;
-
-    kbd->dev = input_dev;
-
-
-    /*ä»¥"å‚å•†åå­— äº§å“åå­—"çš„æ ¼å¼å°†å…¶å†™å…¥kbd->name*/
-
-    if (dev->manufacturer)
-
-      strlcpy(kbd->name, dev->manufacturer, sizeof(kbd->name));
-
-    if (dev->product) {
-
-    if (dev->manufacturer)
-
-      strlcat(kbd->name, " ", sizeof(kbd->name));
-
-      strlcat(kbd->name, dev->product, sizeof(kbd->name));
-
-    }
-
-    /*æ£€æµ‹ä¸åˆ°å‚å•†åå­—*/
-
-    if (!strlen(kbd->name))
-
-    snprintf(kbd->name, sizeof(kbd->name),
-
-        "USB HIDBP Keyboard %04x:%04x",
-
-        le16_to_cpu(dev->descriptor.idVendor),
-
-        le16_to_cpu(dev->descriptor.idProduct));
-
-    /*è®¾å¤‡é“¾æ¥åœ°å€*/
-
-    usb_make_path(dev, kbd->phys, sizeof(kbd->phys));
-
-    strlcpy(kbd->phys, "/input0", sizeof(kbd->phys));
-
-    input_dev->name = kbd->name;
-
-
-    input_dev->phys = kbd->phys;
-
-//* input_dev ä¸­çš„ input_id ç»“æ„ä½“ï¼Œç”¨æ¥å­˜å‚¨å‚å•†ã€è®¾å¤‡ç±»å‹å’Œè®¾å¤‡çš„ç¼–å·ï¼Œè¿™ä¸ªå‡½æ•°æ˜¯å°†è®¾å¤‡æè¿°ç¬¦ * ä¸­çš„ç¼–å·èµ‹ç»™å†…åµŒçš„è¾“å…¥å­ç³»ç»Ÿç»“æ„ä½“ usb_to_input_id(dev, &input_dev->id);
-
-    /* cdev æ˜¯è®¾å¤‡æ‰€å±ç±»åˆ«ï¼ˆclass deviceï¼‰ */
-
-    input_dev->dev = iface->dev;
-
-/* input_dev çš„ pri æ•°æ®é¡¹ç”¨äºè¡¨ç¤ºå½“å‰è¾“å…¥è®¾å¤‡çš„ç§ç±»ï¼Œè¿™é‡Œå°†é”®ç›˜ç»“æ„ä½“å¯¹è±¡èµ‹ç»™å®ƒ */
-
-    input_dev->pri = kbd;
-
-    input_dev->evbit[0] = BIT(EV_KEY)/*é”®ç äº‹ä»¶*/ | BIT(EV_LED)/*LEDäº‹ä»¶*/ | BIT(EV_REP)/*è‡ªåŠ¨é‡è¦†æ•°å€¼*/;
-
-    input_dev->ledbit[0] = BIT(LED_NUML)/*æ•°å­—ç¯*/ | BIT(LED_CAPSL)/*å¤§å°å†™ç¯*/ | BIT(LED_SCROLLL)/*æ»šåŠ¨ç¯*/ | BIT(LED_COMPOSE) | BIT(LED_KANA);
-
-    for (i = 0; i < 255; i++)
-
-    set_bit(usb_kbd_keycode[i], input_dev->keybit);
-
-    clear_bit(0, input_dev->keybit);
-
-    input_dev->event = usb_kbd_event;/*æ³¨å†Œäº‹ä»¶å¤„ç†å‡½æ•°å…¥å£*/
-
-    input_dev->open = usb_kbd_open;/*æ³¨å†Œè®¾å¤‡æ‰“å¼€å‡½æ•°å…¥å£*/
-
-    input_dev->close = usb_kbd_close;/*æ³¨å†Œè®¾å¤‡å…³é—­å‡½æ•°å…¥å£*/
-
-    /*åˆå§‹åŒ–ä¸­æ–­URB*/
-
-    usb_fill_int_urb(kbd->irq/*åˆå§‹åŒ–kbd->irqè¿™ä¸ªurb*/, dev/*è¿™ä¸ªurbè¦å‘é€åˆ°devè¿™ä¸ªè®¾å¤‡*/, pipe/*è¿™ä¸ªurbè¦å‘é€åˆ°pipeè¿™ä¸ªç«¯ç‚¹*/,
-
-    kbd->new/*æŒ‡å‘ç¼“å†²çš„æŒ‡é’ˆ*/, (maxp > 8 ? 8 : maxp)/*ç¼“å†²é•¿åº¦*/,
-
-    usb_kbd_irq/*è¿™ä¸ªurbå®Œæˆæ—¶è°ƒç”¨çš„å¤„ç†å‡½æ•°*/, kbd/*æŒ‡å‘æ•°æ®å—çš„æŒ‡é’ˆï¼Œè¢«æ·»åŠ åˆ°è¿™ä¸ªurbç»“æ„å¯è¢«å®Œæˆå¤„ç†å‡½æ•°è·å–*/, endpoint->bInterval/*urbåº”å½“è¢«è°ƒåº¦çš„é—´éš”*/);
-
-    kbd->irq->transfer_dma = kbd->new_dma; /*æŒ‡å®šurbéœ€è¦ä¼ è¾“çš„DMAç¼“å†²åŒº*/
-
-    kbd->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;/*æœ¬urbæœ‰ä¸€ä¸ªDMAç¼“å†²åŒºéœ€è¦ä¼ è¾“*/
-
-    kbd->cr->bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;/*æ“ä½œçš„æ˜¯ç±»æ¥å£å¯¹è±¡*/
-
-    kbd->cr->bRequest = 0x09; /*ä¸­æ–­è¯·æ±‚ç¼–å·*/
-
-    kbd->cr->wValue = cpu_to_le16(0x200);
-
-    kbd->cr->wIndex = cpu_to_le16(interface->desc.bInterfaceNumber);/*æ¥å£å·*/
-
-    kbd->cr->wLength = cpu_to_le16(1);/*æ•°æ®ä¼ è¾“é˜¶æ®µä¼ è¾“å¤šå°‘ä¸ªbytes*/
-
-    /*åˆå§‹åŒ–æ§åˆ¶URB*/
-
-    usb_fill_control_urb(kbd->led, dev, usb_sndctrlpipe(dev, 0),
-
-    (void *) kbd->cr, kbd->leds, 1,
-
-    usb_kbd_led, kbd);
-
-    kbd->led->setup_dma = kbd->cr_dma;
-
-    kbd->led->transfer_dma = kbd->leds_dma;
-
-    kbd->led->transfer_flags |= (URB_NO_TRANSFER_DMA_MAP | URB_NO_SETUP_DMA_MAP/*å¦‚æœä½¿ç”¨DMAä¼ è¾“åˆ™urbä¸­setup_dmaæŒ‡é’ˆæ‰€æŒ‡å‘çš„ç¼“å†²åŒºæ˜¯DMAç¼“å†²åŒºè€Œä¸æ˜¯setup_packetæ‰€æŒ‡å‘çš„ç¼“å†²åŒº*/);
-
-    /*æ³¨å†Œè¾“å…¥è®¾å¤‡*/
-
-    input_register_device(kbd->dev);
-
-    usb_set_intfdata(iface, kbd);/*è®¾ç½®æ¥å£ç§æœ‰æ•°æ®*/
-
-    return 0;
-
-fail2:   usb_kbd_free_mem(dev, kbd);
-
-fail1:   input_free_device(input_dev);
-
-    kfree(kbd);
-
-    return -ENOMEM;
+	printk("Starting probe\n");
+	struct usb_device *dev = interface_to_usbdev(iface);  //»ñÈ¡usb½Ó¿Ú½á¹¹ÌåÖĞµÄusbÉè±¸½á¹¹Ìå,Ã¿¸öUSBÉè±¸¶ÔÓ¦Ò»¸östruct usb_deviceµÄ±äÁ¿£¬ÓÉusb core¸ºÔğÉêÇëºÍ¸³Öµ
+	struct usb_host_interface *interface;  //Á¬½Óµ½µÄ½Ó¿ÚµÄÃèÊö
+	struct usb_endpoint_descriptor *endpoint;    //´«ÊäÊı¾İ¹ÜµÀµÄ¶Ëµã
+	struct usb_kbd *kbd;  //usbÉè±¸ÔÚÓÃ»§¿Õ¼äµÄÃèÊö
+	struct input_dev *input_dev;  //±íÊ¾ÊäÈëÉè±¸
+	int i, pipe, maxp; 
+	int error = -ENOMEM; 
+	
+	
+	interface = iface->cur_altsetting; //½«Á¬½Óµ½µÄ½Ó¿ÚµÄÃèÊöÉèÖÃÎªµ±Ç°µÄsetting
+	printk("1\n");
+	if (interface->desc.bNumEndpoints != 1) //ÅĞ¶ÏÖĞ¶ÏIN¶ËµãµÄ¸öÊı,¼üÅÌÖ»ÓĞÒ»¸ö¶Ëµã,Èç¹û²»Îª1,Ôò³ö´í,descÊÇÉè±¸ÃèÊö·û
+		return -ENODEV;
+
+	endpoint = &interface->endpoint[0].desc; //È¡µÃ¼üÅÌÖĞ¶ÏIN¶ËµãµÄÃèÊö·û,endpoint[0]±íÊ¾ÖĞ¶Ï¶Ëµã
+	printk("2\n");
+	if (!usb_endpoint_is_int_in(endpoint)) //²é¿´Ëù»ñµÃµÄ¶ËµãÊÇ·ñÎªÖĞ¶ÏIN¶Ëµã
+		return -ENODEV;
+  printk("3\n");
+	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress); //µÃµ½Çı¶¯³ÌĞòµÄÖĞ¶ÏOUT¶ËµãºÅ,´´½¨¹ÜµÀ£¬ÓÃÓÚÁ¬½ÓÇı¶¯³ÌĞò»º³åÇøºÍÉè±¸¶Ë¿Ú
+	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe)); //µÃµ½×î´ó¿ÉÒÔ´«ÊäµÄÊı¾İ°ü(×Ö½Ú)
+
+	kbd = kzalloc(sizeof(struct usb_kbd), GFP_KERNEL); //Îªkbd½á¹¹Ìå·ÖÅäÄÚ´æ,GFP_KERNELÊÇÄÚºËÄÚ´æ·ÖÅäÊ±×î³£ÓÃµÄ±êÖ¾Î»£¬ÎŞÄÚ´æ¿ÉÓÃÊ±¿ÉÒıÆğĞİÃß
+	input_dev = input_allocate_device();   //ÎªÊäÈëÉè±¸µÄ½á¹¹Ìå·ÖÅäÄÚ´æ,²¢³õÊ¼»¯Ëü
+	printk("inputdev-1:%s\n",input_dev->name);
+	printk("4\n");
+	if (!kbd || !input_dev) //¸økbd»òinput_dev·ÖÅäÄÚ´æÊ§°Ü
+		goto fail1;
+        printk("5\n");
+	if (usb_kbd_alloc_mem(dev, kbd)) //·ÖÅäurbÄÚ´æ¿Õ¼äÊ§°Ü,¼´´´½¨urbÊ§°Ü
+		goto fail2;
+	printk("6\n");
+	kbd->usbdev = dev;    //¸økbdµÄusbÉè±¸½á¹¹Ìåusbdev¸³Öµ
+	kbd->dev = input_dev; //¸økbdµÄÊäÈëÉè±¸½á¹¹Ìådev¸³Öµ,½«ËùÓĞÄÚÈİÍ³Ò»ÓÃkbd·â×°,input×ÓÏµÍ³Ö»ÄÜ´¦Àíinput_devÀàĞÍµÄ¶ÔÏó
+	printk("7\n");
+	if (dev->manufacturer) //½«³§ÉÌÃû,²úÆ·Ãû¸³Öµ¸økbdµÄname³ÉÔ±	
+	{
+		printk("7.1\n");
+		strlcpy(kbd->name, dev->manufacturer, sizeof(kbd->name));
+	}
+	printk("8\n");
+	
+	if (dev->product) {
+		printk("7.2\n");
+		if (dev->manufacturer) //ÓĞ³§ÉÌÃû,¾ÍÔÚ²úÆ·ÃûÖ®Ç°¼ÓÈë¿Õ¸ñ
+			strlcat(kbd->name, " ", sizeof(kbd->name));
+		strlcat(kbd->name, dev->product, sizeof(kbd->name));
+	}
+
+	printk("9\n");
+
+  printk("10\n");
+	usb_make_path(dev, kbd->phys, sizeof(kbd->phys)); //·ÖÅäÉè±¸µÄÎïÀíÂ·¾¶µÄµØÖ·£¬Éè±¸Á´½ÓµØÖ·£¬²»ËæÉè±¸µÄ°Î³ö¶ø¸Ä±ä
+	printk("10.1\n");
+	strlcpy(kbd->phys, "/input0", sizeof(kbd->phys));
+	printk("10.2\n");
+	input_dev->name = kbd->name; //¸øinput_devµÄname¸³Öµ
+	printk("inputdevname:%s\n",input_dev->name);
+	printk("kbddevname:%s\n",kbd->dev->name);
+	input_dev->phys = kbd->phys;  //Éè±¸Á´½ÓµØÖ·
+	usb_to_input_id(dev, &input_dev->id); //¸øÊäÈëÉè±¸½á¹¹Ìåinput->µÄ±êÊ¶·û½á¹¹¸³Öµ,Ö÷ÒªÉèÖÃbustype¡¢vendo¡¢productµÈ
+	printk("10.3\n");
+	//input_dev->dev.parent = &iface->dev;
+
+	//input_set_drvdata(input_dev, kbd);
+	printk("10.4\n");
+	input_dev->evbit[0] = BIT_MASK(EV_KEY) /*¼üÂëÊÂ¼ş*/| BIT_MASK(EV_LED) | /*LEDÊÂ¼ş*/
+		BIT_MASK(EV_REP)/*×Ô¶¯ÖØ¸²ÊıÖµ*/;  //Ö§³ÖµÄÊÂ¼şÀàĞÍ
+	printk("10.5\n");
+	input_dev->ledbit[0] = BIT_MASK(LED_NUML) /*Êı×ÖµÆ*/| BIT_MASK(LED_CAPSL) |/*´óĞ¡Ğ´µÆ*/
+		BIT_MASK(LED_SCROLLL)/*¹ö¶¯µÆ*/ ;   //EV_LEDÊÂ¼şÖ§³ÖµÄÊÂ¼şÂë
+	printk("10.6\n");
+
+	for (i = 0; i < 255; i++)
+		set_bit(usb_kbd_keycode[i], input_dev->keybit); // ³õÊ¼»¯,Ã¿¸ö¼üÅÌÉ¨ÃèÂë¶¼¿ÉÒÔ³ö·¢¼üÅÌÊÂ¼ş
+	printk("10.7\n");
+	clear_bit(0, input_dev->keybit); //Îª0µÄ¼üÅÌÉ¨ÃèÂë²»ÄÜ´¥·¢¼üÅÌÊÂ¼ş
+	printk("10.8\n");
+	input_dev->event = usb_kbd_event; //ÉèÖÃinputÉè±¸µÄ´ò¿ª¡¢¹Ø±Õ¡¢Ğ´ÈëÊı¾İÊ±µÄ´¦Àí·½·¨
+	input_dev->open = usb_kbd_open;
+	input_dev->close = usb_kbd_close;
+  //³õÊ¼»¯ÖĞ¶ÏURB
+	usb_fill_int_urb(kbd->irq/*³õÊ¼»¯kbd->irqÕâ¸öurb*/, dev/*Õâ¸öurbÒª·¢ËÍµ½devÕâ¸öÉè±¸*/, pipe/*Õâ¸öurbÒª·¢ËÍµ½pipeÕâ¸ö¶Ëµã*/,
+			 kbd->new/*Ö¸Ïò»º³åµÄÖ¸Õë*/, (maxp > 8 ? 8 : maxp)/*»º³åÇø³¤¶È(²»³¬¹ı8)*/,
+			 usb_kbd_irq/*Õâ¸öurbÍê³ÉÊ±µ÷ÓÃµÄ´¦Àíº¯Êı*/, kbd/*Ö¸ÏòÊı¾İ¿éµÄÖ¸Õë£¬±»Ìí¼Óµ½Õâ¸öurb½á¹¹¿É±»Íê³É´¦Àíº¯Êı»ñÈ¡*/, endpoint->bInterval/*urbÓ¦µ±±»µ÷¶ÈµÄ¼ä¸ô*/);
+	printk("10.9\n");
+	kbd->irq->transfer_dma = kbd->new_dma;  //Ö¸¶¨urbĞèÒª´«ÊäµÄDMA»º³åÇø
+	kbd->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;  //±¾urbÓĞÒ»¸öDMA»º³åÇøĞèÒª´«Êä£¬ÓÃDMA´«ÊäÒªÉèµÄ±êÖ¾
+
+	kbd->cr->bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;  //²Ù×÷µÄÊÇUSBÀà½Ó¿Ú¶ÔÏó
+	kbd->cr->bRequest = 0x09;  //ÖĞ¶ÏÇëÇó±àºÅ
+	kbd->cr->wValue = cpu_to_le16(0x200); //´ó¶Ë¡¢Ğ¡¶ËÄ£Ê½×ª»»
+	kbd->cr->wIndex = cpu_to_le16(interface->desc.bInterfaceNumber); //½Ó¿ÚºÅ
+	kbd->cr->wLength = cpu_to_le16(1);  //Ò»´ÎÊı¾İ´«ÊäÒª´«µÄ×Ö½ÚÊı
+  //³õÊ¼»¯¿ØÖÆURB
+	printk("10.10\n");
+	usb_fill_control_urb(kbd->led/*³õÊ¼»¯kbd->ledÕâ¸öurb*/, dev/*Õâ¸öurbÒªÓÉdevÕâ¸öÉè±¸·¢³ö*/, usb_sndctrlpipe(dev, 0)/*urb·¢ËÍµ½µÄ¶Ëµã*/,
+			     (void *) kbd->cr/*·¢ËÍµÄsetup packet*/, kbd->leds/*´ı·¢ËÍÊı¾İµÄ»º³åÇø*/, 1/*·¢ËÍÊı¾İ³¤¶È*/,
+			     usb_kbd_led/*Õâ¸öurbÍê³ÉÊ±µ÷ÓÃµÄ´¦Àíº¯Êı*/, kbd/*Ö¸ÏòÊı¾İ¿éµÄÖ¸Õë£¬±»Ìí¼Óµ½Õâ¸öurb½á¹¹¿É±»Íê³É´¦Àíº¯Êı»ñÈ¡*/);
+	kbd->led->setup_dma = kbd->cr_dma;  //Ö¸¶¨urbĞèÒª´«ÊäµÄDMA»º³åÇø
+	kbd->led->transfer_dma = kbd->leds_dma;  //±¾urbÓĞÒ»¸öDMA»º³åÇøĞèÒª´«Êä,ÓÃDMA´«ÊäÒªÉèµÄ±êÖ¾
+	kbd->led->transfer_flags |= (URB_NO_TRANSFER_DMA_MAP | URB_NO_SETUP_DMA_MAP/*Èç¹ûÊ¹ÓÃDMA´«ÊäÔòurbÖĞsetup_dmaÖ¸ÕëËùÖ¸ÏòµÄ»º³åÇøÊÇDMA»º³åÇø¶ø²»ÊÇsetup_packetËùÖ¸ÏòµÄ»º³åÇø*/);   
+	
+	printk("10.11\n");
+	printk("kbddevname1:%s\n",kbd->dev->name);
+	error = input_register_device(kbd->dev);  //×¢²áÊäÈëÉè±¸
+	printk("11\n");
+	if (error)  //×¢²áÊ§°Ü
+		goto fail2;
+
+	usb_set_intfdata(iface, kbd);  //ÉèÖÃ½Ó¿ÚË½ÓĞÊı¾İ,ÏòÄÚºË×¢²áÒ»¸ödata£¬Õâ¸ödataµÄ½á¹¹¿ÉÒÔÊÇÈÎÒâµÄ£¬Õâ¶Î³ÌĞòÏòÄÚºË×¢²áÁËÒ»¸öusb_kbd½á¹¹,Õâ¸ödata¿ÉÒÔÔÚÒÔºóÓÃusb_get_intfdataÀ´µÃµ½
+	printk("12\n");
+	return 0;
+
+fail2:	
+	usb_kbd_free_mem(dev, kbd);  //ÊÍ·ÅURBÄÚ´æ¿Õ¼ä,Ïú»ÙURB
+fail1:	
+	input_free_device(input_dev); //ÊÍ·Åinput_devºÍkbdµÄ¿Õ¼ä
+	kfree(kbd);
+	return error;
 }
-/*æ–­å¼€è¿æ¥(å¦‚é”®ç›˜è®¾å¤‡æ‹”å‡º)çš„å¤„ç†å‡½æ•°*/
 
 static void usb_kbd_disconnect(struct usb_interface *intf)
 {
+	struct usb_kbd *kbd = usb_get_intfdata (intf);
 
-    struct usb_kbd *kbd = usb_get_intfdata (intf);/*è·å–æ¥å£çš„ç§æœ‰æ•°æ®ç»™kbd*/
-
-    usb_set_intfdata(intf, NULL);/*è®¾ç½®æ¥å£çš„ç§æœ‰æ•°æ®ä¸ºNULL*/
-
-    if (kbd) {
-
-    usb_kill_urb(kbd->irq);/*å–æ¶ˆä¸­æ–­è¯·æ±‚*/
-
-    input_unregister_device(kbd->dev);/*æ³¨é”€è®¾å¤‡*/
-
-    usb_kbd_free_mem(interface_to_usbdev(intf), kbd);/*é‡Šæ”¾å†…å­˜ç©ºé—´*/
-
-    kfree(kbd);
-
-    }
+	usb_set_intfdata(intf, NULL);
+	if (kbd) {
+		usb_kill_urb(kbd->irq);
+                printk("disconnect1\n");
+		input_unregister_device(kbd->dev);
+		printk("disconnect2\n");
+		usb_kbd_free_mem(interface_to_usbdev(intf), kbd);
+		kfree(kbd);
+	}
 }
 
-/*
- static struct usb_device_id usb_kbd_id_table [] = {
-	{ USB_DEVICE(USB_HOTKEY_VENDOR_ID, USB_HOTKEY_PRODUCT_ID) },
-	{ } //Terminating entry 
-};
-*/
-
-static struct usb_driver usb_kbd_driver = {               /*USBé”®ç›˜é©±åŠ¨ç»“æ„ä½“*/
-	.name= "Topkey",                                      /*é©±åŠ¨åå­—*/
-	.probe= usb_kbd_probe,                            /*é©±åŠ¨æ¢æµ‹å‡½æ•°,åŠ è½½æ—¶ç”¨åˆ°*/
-	.disconnect= usb_kbd_disconnect,                   /*é©±åŠ¨æ–­å¼€å‡½æ•°,åœ¨å¸è½½æ—¶ç”¨åˆ°*/
-	.id_table= usb_kbd_id_table,                      /*é©±åŠ¨è®¾å¤‡IDè¡¨,ç”¨æ¥æŒ‡å®šè®¾å¤‡æˆ–æ¥å£*/
+static struct usb_device_id usb_kbd_id_table [] = {  //¸ù¾İ¸Ã±íÖĞµÄĞÅÏ¢Æ¥ÅäÉè±¸£¬ÕÒµ½Éè±¸ºó£¬µ÷ÓÃprobe£¨£©
+	{ USB_DEVICE(USB_KEYBOARD_VENDOR_ID, USB_KEYBOARD_PRODUCT_ID) },
+	{ } 
 };
 
-static int __init usb_kbd_init(void)                   /*é©±åŠ¨ç¨‹åºç”Ÿå‘½å‘¨æœŸçš„å¼€å§‹ç‚¹ï¼Œå‘ USB core æ³¨å†Œè¿™ä¸ªé”®ç›˜é©±åŠ¨ç¨‹åºã€‚*/
+MODULE_DEVICE_TABLE (usb, usb_kbd_id_table);
+
+static struct usb_driver usb_kbd_driver = {  //ÉùÃ÷Ò»¸öusb_driverÀàĞÍµÄ¶ÔÏó,²¢¸øËüµÄ¸÷¸öÓò¸³Öµ
+	.name =		"usbkbd",
+	.probe =	usb_kbd_probe,
+	.disconnect =	usb_kbd_disconnect,
+	.id_table =	usb_kbd_id_table,
+};
+
+static int __init usb_kbd_init(void)
 {
-    printk("Registering usb keyboard driver driver...\n");
-	int result = usb_register(&usb_kbd_driver);/*æ³¨å†ŒUSBé”®ç›˜é©±åŠ¨*/
-	if (result == 0) /*æ³¨å†Œå¤±è´¥*/
-        printk(DRIVER_VERSION ":" DRIVER_DESC);
-    printk("Registered successfully!\n");
+	printk("Registering...\n");
+	int result = usb_register(&usb_kbd_driver);  //×¢²áÉè±¸
+	if (result == 0)  //×¢²á³É¹¦
+		printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_VERSION ":"
+				DRIVER_DESC "\n");
+	printk("Registered!\n");
 	return result;
-	//usb_register(&usb_kbd_driver);
-	//info(DRIVER_VERSION ":" DRIVER_DESC);
-	//return 0;
 }
-static void __exit usb_kbd_exit(void)                  /* é©±åŠ¨ç¨‹åºç”Ÿå‘½å‘¨æœŸçš„ç»“æŸç‚¹ï¼Œå‘ USB core æ³¨é”€è¿™ä¸ªé”®ç›˜é©±åŠ¨ç¨‹åºã€‚ */
-{
-    printk("Deregistering usb keyboard driver...\n");
-	usb_deregister(&usb_kbd_driver);              /*æ³¨é”€USBé”®ç›˜é©±åŠ¨*/
-	printk("Derigistered successfully!\n");
-}
-module_init(usb_kbd_init);                               /* æŒ‡å®šæ¨¡å—åˆå§‹åŒ–å‡½æ•°(è¢«æŒ‡å®šçš„å‡½æ•°åœ¨insmodé©±åŠ¨æ—¶è°ƒç”¨)*/
-module_exit(usb_kbd_exit);                           /* æŒ‡å®šæ¨¡å—é€€å‡ºå‡½æ•°(è¢«æŒ‡å®šçš„å‡½æ•°åœ¨rmmodé©±åŠ¨æ—¶è°ƒç”¨)*/
 
+static void __exit usb_kbd_exit(void)
+{
+	printk("Deregistering...\n");
+	usb_deregister(&usb_kbd_driver);  //×¢ÏúÉè±¸
+	printk("Deregistered!\n");
+}
+
+module_init(usb_kbd_init);
+module_exit(usb_kbd_exit);
